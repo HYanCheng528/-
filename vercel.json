@@ -33,6 +33,6 @@
     }
   ],
   "env": {
-    "API_KEY": "${API_KEY}"
+    "VERCEL_API_KEY": "${VERCEL_API_KEY}"
   }
 }

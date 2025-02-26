@@ -55,6 +55,10 @@ const server = http.createServer(async (req, res) => {
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 120000); // 延长超时时间到120秒
 
+                // 添加请求超时处理
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 120000); // 延长超时时间到120秒
+
                 const apiResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: API_HEADERS,
@@ -71,9 +75,24 @@ const server = http.createServer(async (req, res) => {
                     signal: controller.signal
                 });
 
+                // 添加响应时间日志
+                const responseTime = Date.now() - requestStartTime;
+                console.log('API响应时间:', responseTime, 'ms');
+
+                // 如果响应时间过长，记录警告
+                if (responseTime > 10000) {
+                    console.warn('API响应时间过长，建议优化');
+                }
+
                 // 详细的错误处理
                 if (!apiResponse.ok) {
                     const errorText = await apiResponse.text();
+                    console.error('API响应错误:', {
+                        status: apiResponse.status,
+                        statusText: apiResponse.statusText,
+                        errorText: errorText,
+                        requestTime: new Date().toISOString()
+                    });
                     const errorMessage = handleApiError(apiResponse.status, errorText);
                     throw new Error(errorMessage);
                 }
