@@ -50,7 +50,7 @@ const generateNames = async () => {
     ]
 }`;
 
-        const response = await fetch('http://localhost:3001/generate-name', {
+        const response = await fetch('/generate-name', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
