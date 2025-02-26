@@ -4,12 +4,29 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 
 // 使用环境变量中的API密钥，确保在Vercel平台上能正确获取
 const API_KEY = process.env.VERCEL_API_KEY || process.env.API_KEY;
-if (!API_KEY) {
-    console.error('错误：未设置API密钥！请确保设置了环境变量VERCEL_API_KEY或API_KEY');
-    process.exit(1);
+
+// 增强环境变量检查
+const checkEnvironmentVariables = () => {
+    if (!API_KEY) {
+        console.error('错误：未设置API密钥！请确保在Vercel平台上配置了VERCEL_API_KEY环境变量');
+        console.error('当前环境变量:', {
+            NODE_ENV: process.env.NODE_ENV,
+            VERCEL_ENV: process.env.VERCEL_ENV,
+            hasVercelApiKey: !!process.env.VERCEL_API_KEY,
+            hasApiKey: !!process.env.API_KEY
+        });
+        process.exit(1);
+    }
+    console.log('环境变量检查通过，API密钥已配置');
 }
 
+checkEnvironmentVariables();
+
 const API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+
+// 添加请求重试配置
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1秒
 
 // 添加请求头配置
 const API_HEADERS = {
@@ -53,9 +70,18 @@ const server = http.createServer(async (req, res) => {
                 // 调用火山引擎API
                 // 添加请求超时处理
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 120000); // 延长超时时间到120秒
+                const timeout = setTimeout(() => {
+                    controller.abort();
+                    console.error('请求超时，已中断');
+                }, 30000); // 设置30秒超时
 
-                const apiResponse = await fetch(API_URL, {
+                let retryCount = 0;
+                let apiResponse;
+
+                while (retryCount < MAX_RETRIES) {
+                    try {
+                        console.log(`尝试请求API (第${retryCount + 1}次)...`);
+                        apiResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: API_HEADERS,
                     body: JSON.stringify({
@@ -70,9 +96,28 @@ const server = http.createServer(async (req, res) => {
                     }),
                     signal: controller.signal
                 });
+                        
+                        if (apiResponse.ok) break;
+                        
+                        retryCount++;
+                        if (retryCount < MAX_RETRIES) {
+                            console.log(`请求失败，${RETRY_DELAY/1000}秒后重试...`);
+                            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+                        }
+                    } catch (fetchError) {
+                        console.error(`请求出错 (第${retryCount + 1}次):`, fetchError);
+                        retryCount++;
+                        if (retryCount < MAX_RETRIES) {
+                            console.log(`请求出错，${RETRY_DELAY/1000}秒后重试...`);
+                            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+                        } else {
+                            throw fetchError;
+                        }
+                    }
+                }
 
                 // 详细的错误处理
-                if (!apiResponse.ok) {
+                if (!apiResponse || !apiResponse.ok) {
                     const errorText = await apiResponse.text();
                     console.error('API响应错误:', {
                         status: apiResponse.status,
