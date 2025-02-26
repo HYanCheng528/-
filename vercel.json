@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/generate-name",
+      "dest": "server.js"
+    },
+    {
+      "src": "/client.js",
+      "dest": "client.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
+  ],
+  "env": {
+    "API_KEY": "@api_key"
+  }
+}

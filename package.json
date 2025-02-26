@@ -1,0 +1,22 @@
+{
+  "name": "chinese-name-generator",
+  "version": "1.0.0",
+  "description": "一个基于AI的中文名字生成器",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HYanCheng528/-.git"
+  },
+  "author": "HYanCheng528",
+  "license": "MIT"
+}
