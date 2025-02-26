@@ -96,29 +96,44 @@ const server = http.createServer(async (req, res) => {
                 const apiData = await apiResponse.json();
                 clearTimeout(timeout);
                 if (!apiData || !apiData.choices || !apiData.choices[0] || !apiData.choices[0].message) {
-                    throw new Error('Invalid API response format');
+                    throw new Error('无效的API响应格式，请检查API配置');
                 }
 
                 let generatedNames;
                 try {
-                    // 预处理AI返回的内容，移除可能导致JSON解析错误的字符
-                    let content = apiData.choices[0].message.content;
-                    // 尝试找到JSON对象的开始和结束位置
-                    const startIndex = content.indexOf('{');
-                    const endIndex = content.lastIndexOf('}');
+                    // 预处理AI返回的内容
+                    let content = apiData.choices[0].message.content.trim();
                     
-                    if (startIndex === -1 || endIndex === -1) {
-                        throw new Error('AI返回的内容中未找到有效的JSON格式');
+                    // 尝试直接解析整个内容
+                    try {
+                        generatedNames = JSON.parse(content);
+                    } catch {
+                        // 如果直接解析失败，尝试提取JSON部分
+                        const startIndex = content.indexOf('{');
+                        const endIndex = content.lastIndexOf('}');
+                        
+                        if (startIndex === -1 || endIndex === -1) {
+                            console.error('API返回内容:', content);
+                            throw new Error('AI返回的内容中未找到有效的JSON格式');
+                        }
+                        
+                        content = content.substring(startIndex, endIndex + 1);
+                        generatedNames = JSON.parse(content);
                     }
                     
-                    // 提取JSON部分
-                    content = content.substring(startIndex, endIndex + 1);
-                    
-                    // 解析JSON
-                    generatedNames = JSON.parse(content);
-                    
+                    // 验证数据结构
                     if (!generatedNames.names || !Array.isArray(generatedNames.names)) {
-                        throw new Error('AI返回的数据格式不符合预期结构');
+                        console.error('解析后的数据:', generatedNames);
+                        throw new Error('AI返回的数据结构不符合预期');
+                    }
+
+                    // 确保每个名字对象都有必要的字段
+                    generatedNames.names = generatedNames.names.filter(name => {
+                        return name && name.chinese_name && name.explanation_cn && name.explanation_en;
+                    });
+
+                    if (generatedNames.names.length === 0) {
+                        throw new Error('没有生成有效的名字');
                     }
                 } catch (parseError) {
                     console.error('Parse error:', parseError);
