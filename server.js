@@ -2,7 +2,13 @@ const http = require('http');
 const url = require('url');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-const API_KEY = process.env.API_KEY || 'c0e0a23f-15bb-4f6c-80c1-ca560a13a727';
+// 使用环境变量中的API密钥，确保在Vercel平台上能正确获取
+const API_KEY = process.env.VERCEL_API_KEY || process.env.API_KEY;
+if (!API_KEY) {
+    console.error('错误：未设置API密钥！请确保设置了环境变量VERCEL_API_KEY或API_KEY');
+    process.exit(1);
+}
+
 const API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 // 添加请求头配置
@@ -30,37 +36,7 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // 处理静态文件
-    if (req.method === 'GET') {
-        const parsedUrl = url.parse(req.url);
-        const path = parsedUrl.pathname;
-
-        if (path === '/') {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            require('fs').readFile('index.html', (err, data) => {
-                if (err) {
-                    res.writeHead(500);
-                    res.end('Error loading index.html');
-                    return;
-                }
-                res.end(data);
-            });
-            return;
-        }
-
-        if (path === '/client.js') {
-            res.writeHead(200, { 'Content-Type': 'application/javascript' });
-            require('fs').readFile('client.js', (err, data) => {
-                if (err) {
-                    res.writeHead(500);
-                    res.end('Error loading client.js');
-                    return;
-                }
-                res.end(data);
-            });
-            return;
-        }
-    }
+    // Vercel会自动处理静态文件，这里只需要处理API请求
 
     // 处理API请求
     if (req.method === 'POST' && req.url === '/generate-name') {
@@ -98,24 +74,7 @@ const server = http.createServer(async (req, res) => {
                 // 详细的错误处理
                 if (!apiResponse.ok) {
                     const errorText = await apiResponse.text();
-                    console.error('API Error:', {
-                        status: apiResponse.status,
-                        statusText: apiResponse.statusText,
-                        errorText,
-                        url: API_URL,
-                        requestTime: new Date().toISOString()
-                    });
-                    
-                    // 根据不同的错误状态码返回相应的错误信息
-                    let errorMessage = '生成名字时出错';
-                    if (apiResponse.status === 429) {
-                        errorMessage = '请求过于频繁，请稍后再试';
-                    } else if (apiResponse.status === 401 || apiResponse.status === 403) {
-                        errorMessage = 'API认证失败，请检查API密钥';
-                    } else if (apiResponse.status >= 500) {
-                        errorMessage = '服务器暂时不可用，请稍后再试';
-                    }
-                    
+                    const errorMessage = handleApiError(apiResponse.status, errorText);
                     throw new Error(errorMessage);
                 }
 
@@ -179,3 +138,28 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
+
+// 优化错误处理逻辑
+const handleApiError = (status, errorText) => {
+    console.error('API Error:', {
+        status,
+        errorText,
+        url: API_URL,
+        requestTime: new Date().toISOString()
+    });
+    
+    switch (status) {
+        case 429:
+            return '请求过于频繁，请稍后再试';
+        case 401:
+        case 403:
+            return 'API认证失败，请检查API密钥';
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+            return '服务器暂时不可用，请稍后再试';
+        default:
+            return `生成名字时出错 (错误代码: ${status})`;
+    }
+};
